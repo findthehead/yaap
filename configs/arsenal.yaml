@@ -1,0 +1,375 @@
+# make sure the tools are already installed on the machine you are testing from
+# Authentication configuration (optional)
+auth:
+  bearer_token: null  # Set to your JWT/Bearer token for authenticated testing (e.g., "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...")
+  # Example: bearer_token: "your_token_here"
+  # If null, testing will proceed without authentication
+
+arsenal:
+  - kind: "recon"
+    tools:
+      - name: curl
+        category: "http_client"
+        description: "Always use this tool to quickly interact with the {{host}} and Transfer data from or to a server using HTTP, HTTPS to detect unusual headers"
+        commands:
+          - fetch_headers:
+              cmd: 'curl -I {{host}}'
+              purpose: "Fetch HTTP headers from a host"
+          - verbose_request:
+              cmd: 'curl -v {{host}}'
+              purpose: "Verbose HTTP request for debugging"
+          - follow_redirects:
+              cmd: 'curl -L {{host}}'
+              purpose: "Follow HTTP redirects"
+          - post_data:
+              cmd: 'curl -X POST -d "param1=value1" {{host}}'
+              purpose: "Send POST request with data"
+
+      - name: whatweb
+        category: "tech_detection"
+        description: "Web technology fingerprinting tool"
+        commands:
+          - identify:
+              cmd: 'whatweb -a 3 {{host}}'
+              purpose: "Identify web technologies and versions"
+
+  
+      - name: lynx
+        category: "crawler"
+        description: "Text-based web browser for terminal will help you to interact with client side Javascript for finding code vulnerability aand secrets"
+        commands:
+          - dump_html:
+              cmd: 'lynx -dump {{host}}'
+              purpose: "Dump HTML content of host as text"
+          - list_links:
+              cmd: 'lynx -listonly -nonumbers {{host}}'
+              purpose: "List all links found on host"    
+
+      - name: nuclei
+        category: "vulnerability_scanner"
+        description: "Simple Template-based vulnerability scanner"
+        commands:
+          - vuln_scan:
+              cmd: 'nuclei -u {{host}} -severity low,medium,high,critical'
+              purpose: "Scan using vulnerability templates"
+
+      - name: wpscan
+        category: "cms_scanner"
+        description: "Run this vulnerability scanner only if {{host}} is running WordPress otherwise dont run this scanner"
+        commands:
+          - wp_scan:
+              cmd: 'wpscan --url http://{{host}} --output wpscan_results.txt'
+              purpose: "Scan WordPress installations for vulnerabilities"
+        patterns:
+          - regex: "\\[\\+\\] WordPress version \\d+\\.\\d+"
+            type: "cms_info"
+            severity: "info"
+          - regex: "\\[\\!\\] Title: .*?\\[VULNERABLE\\]"
+            type: "vulnerability"
+            severity: "high"
+
+#make sure you import all the wordlist to /usr/share/wordlists directory
+  - kind: "hunt"
+    tools:
+      - name: curl
+        category: "http client / scripting"
+        description: >
+            Ubiquitous command-line HTTP client for issuing single or scripted requests.
+            Very useful for one-off checks, scripted replay, header/body manipulation, file upload,
+            and proxying. Replace placeholders ({{host}}, {{port}}, {{path}}, {{datafile}}, {{auth}}, {{header}}) before execution.
+        commands:
+            - simple_get:
+                cmd: 'curl -v http://{{host}}:{{port}}/{{path}}'
+                purpose: "Verbose GET request to inspect response headers and body."
+            - follow_redirects:
+                cmd: 'curl -L -v http://{{host}}:{{port}}/{{path}}'
+                purpose: "Follow (HTTP 3xx) redirects and show verbose output."
+            - get_with_custom_header:
+                cmd: 'curl -v -H "X-My-Header: {{header}}" http://{{host}}:{{port}}/{{path}}'
+                purpose: "Send a GET request with a custom header (useful to test header handling)."
+            - post_json_inline:
+                cmd: 'curl -v -X POST -H "Content-Type: application/json" -d ''{{json}}'' http://{{host}}:{{port}}/{{path}}'
+                purpose: "POST a JSON payload provided inline (careful with shell quoting)."
+            - post_json_from_file:
+                cmd: 'curl -v -X POST -H "Content-Type: application/json" --data-binary @{{datafile}} http://{{host}}:{{port}}/{{path}}'
+                purpose: "POST JSON or raw body read from a file (preserves exact bytes)."
+            - put_with_file:
+                cmd: 'curl -v -X PUT --data-binary @{{datafile}} -H "Content-Type: application/octet-stream" http://{{host}}:{{port}}/{{path}}'
+                purpose: "Upload/replace resource using PUT with raw file contents."
+            - delete_request:
+                cmd: 'curl -v -X DELETE http://{{host}}:{{port}}/{{path}}'
+                purpose: "Send a DELETE request to remove a resource."
+            - patch_with_inline:
+                cmd: 'curl -v -X PATCH -H "Content-Type: application/json" -d ''{{json}}'' http://{{host}}:{{port}}/{{path}}'
+                purpose: "Send a PATCH request with a JSON fragment inline."
+            - multipart_file_upload:
+                cmd: 'curl -v -F "file=@{{datafile}}" -F "other=val" http://{{host}}:{{port}}/{{path}}'
+                purpose: "Send multipart/form-data (file upload) along with form fields."
+            - basic_auth:
+                cmd: 'curl -v -u "{{user}}:{{password}}" http://{{host}}:{{port}}/{{path}}'
+                purpose: "HTTP Basic auth (username:password) for endpoints requiring basic auth."
+            - bearer_token_auth:
+                cmd: 'curl -v -H "Authorization: Bearer {{token}}" http://{{host}}:{{port}}/{{path}}'
+                purpose: "Send a Bearer token in Authorization header."
+            - send_raw_request_from_file:
+                cmd: 'curl -v --raw -X {{method}} --data-binary @{{datafile}} -H "Content-Type: {{ctype}}" http://{{host}}:{{port}}/{{path}}'
+                purpose: "Send exact bytes from file as request body; good for binary payloads or exact replay."
+            - proxy_request:
+                cmd: 'curl -v -x http://127.0.0.1:{{proxy_port}} http://{{host}}:{{port}}/{{path}}'
+                purpose: "Route request through an HTTP proxy (useful to integrate with intercepting proxies)."
+            - insecure_tls:
+                cmd: 'curl -v --insecure https://{{host}}:{{port}}/{{path}}'
+                purpose: "Bypass TLS cert verification (useful for self-signed test servers)."
+            - dump_response_headers_and_body:
+                cmd: 'curl -sS -D response_headers.txt -o response_body.bin -X {{method}} -H "{{header}}" --data-binary @{{datafile}} http://{{host}}:{{port}}/{{path}}'
+                purpose: "Save response headers and body to files for later analysis."
+            - send_custom_request_with_config_file:
+                cmd: 'curl -K {{curl_config}}'
+                purpose: "Use a curl config file (see examples) to store complex request parameters and replay them easily."
+            - replay_many_urls_parallel:
+                cmd: 'cat urls.txt | xargs -n1 -P10 -I{} curl -s -o /dev/null -w "%{http_code} %{url_effective}\\n" {}'
+                purpose: "Quick parallel probing of many URLs listed in urls.txt (10 parallel jobs here)."
+            - verbose_trace_tcp:
+                cmd: 'curl -v --trace-ascii trace.txt http://{{host}}:{{port}}/{{path}}'
+                purpose: "Write a detailed ASCII trace of the request/response on TCP level for debugging."
+
+
+      - name: ffuf
+        category: "fuzzer"
+        description: >
+          Web content and parameter fuzzing utility. Supports directory, file, parameter, and vhost fuzzing.
+          Replace placeholders ({{host}}, {{path}}, {{param}}) before execution.
+        commands:
+          - directory_fuzz:
+              cmd: 'ffuf -u http://{{host}}/{{path}}/FUZZ -w /usr/share/seclists/Discovery/Web-Content/common.txt -t 50 -mc 200,301,302'
+              purpose: "Fuzz for hidden directories and files in a given path"
+          - file_extension_fuzz:
+              cmd: 'ffuf -u http://{{host}}/{{path}}/indexFUZZ -w /usr/share/wordlists/extensions_common.txt -t 50 -mc 200,301,302'
+              purpose: "Fuzz for possible file extensions (e.g., .php, .bak, .old)"
+          - parameter_name_fuzz:
+              cmd: 'ffuf -u "http://{{host}}/{{path}}?FUZZ={{param}}" -w /usr/share/wordlists/parameters.txt -t 50 -mc 200,301,302'
+              purpose: "Discover hidden or undocumented parameter names in query strings"
+          - parameter_value_fuzz:
+              cmd: 'ffuf -u "http://{{host}}/{{path}}?{{param}}=FUZZ" -w /usr/share/wordlists/values.txt -t 50 -mc 200,301,302'
+              purpose: "Test for interesting parameter values (e.g., injections, IDs, keywords)"
+          - virtual_host_fuzz:
+              cmd: 'ffuf -u http://{{host}} -H "Host: FUZZ.{{host}}" -w /usr/share/wordlists/vhosts.txt -t 50 -mc 200,301,302'
+              purpose: "Discover virtual hosts or subdomains resolving to the same IP"
+          - recursive_fuzz:
+              cmd: 'ffuf -u http://{{host}}/{{path}}/FUZZ -w /usr/share/seclists/Discovery/Web-Content/common.txt -recursion -recursion-depth 2 -t 40 -mc 200,301,302'
+              purpose: "Recursively fuzz directories and subdirectories"
+          - rate_limited_fuzz:
+              cmd: 'ffuf -u http://{{host}}/{{path}}/FUZZ -w /usr/share/seclists/Discovery/Web-Content/common.txt -rate 5 -t 20 -mc 200,301,302'
+              purpose: "Perform fuzzing with rate limiting to avoid overwhelming the host"
+          - filter_by_size:
+              cmd: 'ffuf -u http://{{host}}/{{path}}/FUZZ -w /usr/share/seclists/Discovery/Web-Content/common.txt -fs 1234'
+              purpose: "Filter out responses of a specific size (to remove false positives)"
+          - filter_by_word_count:
+              cmd: 'ffuf -u http://{{host}}/{{path}}/FUZZ -w /usr/share/seclists/Discovery/Web-Content/common.txt -fw 50'
+              purpose: "Filter out responses with a specific word count"
+          - save_output:
+              cmd: 'ffuf -u http://{{host}}/{{path}}/FUZZ -w /usr/share/seclists/Discovery/Web-Content/common.txt -o output/ffuf_{{host}}.json -of json'
+              purpose: "Save fuzzing results in JSON format for later analysis"
+
+
+      - name: mitmproxy
+        category: "intercepting proxy"
+        description: >
+            Interactive HTTP/HTTPS proxy for inspecting, modifying and replaying requests and responses.
+            Supports console UI (`mitmproxy`), web UI (`mitmweb`), and non-interactive scripting/dumping (`mitmdump`).
+            Placeholders ({{host}}, {{port}}, {{path}}, {{flowfile}}) should be replaced prior to execution.
+        commands:
+            - start_console:
+                cmd: 'mitmproxy -p {{port}}'
+                purpose: "Start interactive console proxy on specified port (inspect & manually edit flows)."
+            - start_web_ui:
+                cmd: 'mitmweb -p {{port}} --web-open-browser=false'
+                purpose: "Start web UI (browser-based) for inspecting and editing flows remotely."
+            - capture_to_file:
+                cmd: 'mitmdump -p {{port}} -w {{flowfile}}'
+                purpose: "Run a headless capture that records all proxied flows to a file for later analysis or replay."
+            - open_saved_flows_in_console:
+                cmd: 'mitmproxy -r {{flowfile}}'
+                purpose: "Open previously recorded flows in the interactive console for manual inspection/edits/replay."
+            - replay_requests_from_file:
+                cmd: 'mitmdump -p {{port}} -q -S --set replay_kill_extra=false -r {{flowfile}}'
+                purpose: "Replay requests from a saved flow file through the proxy (non-interactive replay to target servers)."
+            - replay_server_responses_locally:
+                cmd: 'mitmdump --server-replay {{flowfile}}'
+                purpose: "Replay recorded server responses locally (useful for offline response replay/testing without hitting origin)."
+            - run_with_script:
+                cmd: 'mitmproxy -s ./scripts/modify_headers.py -p {{port}}'
+                purpose: "Start mitmproxy with a Python script to automatically modify requests/responses."
+            - dump_request_bodies:
+                cmd: 'mitmdump -p {{port}} -s "flowdetail: from mitmproxy import ctx; def response(flow): open(\'bodies.txt\', \'a\').write(flow.request.method+\" \" + flow.request.url + \"\\n\" + (flow.request.get_text() or \"\") + \"\\n---\\n\")"'
+                purpose: "Quick one-liner to dump request bodies and URLs to a file via an inline script (useful when you can't create files)."
+            - simple_curl_via_proxy:
+                cmd: 'curl -x http://127.0.0.1:{{port}} -v http://{{host}}/{{path}}'
+                purpose: "Send a single HTTP request via the local mitmproxy instance (useful to trigger/verify capture)."
+            - tls_mitm_setup_note:
+                cmd: 'echo "Install mitmproxy CA on client: mitm.it (open while mitmproxy is running) or copy ~/.mitmproxy/mitmproxy-ca-cert.pem to trusted store"'
+                purpose: "Reminder to install mitmproxy CA on client devices/browsers to enable HTTPS interception."
+
+    
+
+      - name: sqlmap
+        category: "sql_injection_scanner"
+        description: >
+          Automated SQL injection discovery and exploitation tool. Commands below target a host;
+          replace placeholders ({{host}}, {{path}}, {{param}}, {{dbname}}, {{table}}) before use.
+        commands:
+          - quick_test:
+              cmd: 'sqlmap -u "http://{{host}}/{{path}}?{{param}}=1" --batch --threads=5 --random-agent --technique=BEUSTQ'
+              purpose: "Non-interactive quick scan using multiple techniques with random User-Agent"
+          - level_risk_scan:
+              cmd: 'sqlmap -u "http://{{host}}/{{path}}?{{param}}=1" -p "{{param}}" --level=5 --risk=3 --batch --threads=10'
+              purpose: "Deep scanning (higher level/risk) on a specific parameter"
+          - enumerate_dbs:
+              cmd: 'sqlmap -u "http://{{host}}/{{path}}?{{param}}=1" -p "{{param}}" --dbs --batch --threads=5'
+              purpose: "Enumerate databases available to the injectable parameter"
+          - enumerate_tables:
+              cmd: 'sqlmap -u "http://{{host}}/{{path}}?{{param}}=1" -p "{{param}}" -D "{{dbname}}" --tables --batch'
+              purpose: "List tables in a specific database"
+          - enumerate_columns:
+              cmd: 'sqlmap -u "http://{{host}}/{{path}}?{{param}}=1" -p "{{param}}" -D "{{dbname}}" -T "{{table}}" --columns --batch'
+              purpose: "List columns for a specific table"
+          - dump_table:
+              cmd: 'sqlmap -u "http://{{host}}/{{path}}?{{param}}=1" -p "{{param}}" -D "{{dbname}}" -T "{{table}}" --dump --batch --threads=5'
+              purpose: "Dump rows from a specified table"
+          - dump_all:
+              cmd: 'sqlmap -u "http://{{host}}/{{path}}?{{param}}=1" -p "{{param}}" --dump-all --batch --threads=10'
+              purpose: "Attempt to dump all databases/tables exposed via the injectable parameter"
+          - os_shell:
+              cmd: 'sqlmap -u "http://{{host}}/{{path}}?{{param}}=1" -p "{{param}}" --os-shell --batch'
+              purpose: "Attempt to get an OS shell (very intrusive) — ensure explicit authorization"
+          - sql_shell:
+              cmd: 'sqlmap -u "http://{{host}}/{{path}}?{{param}}=1" -p "{{param}}" --sql-shell --batch'
+              purpose: "Open an interactive SQL shell against the back-end DB (non-graphical interactive)"
+          - tamper_example:
+              cmd: 'sqlmap -u "http://{{host}}/{{path}}?{{param}}=1" -p "{{param}}" --tamper=space2comment,between --batch'
+              purpose: "Use tamper scripts to bypass basic WAF/filters (example tamper list)"
+          - use_proxy:
+              cmd: 'sqlmap -u "http://{{host}}/{{path}}?{{param}}=1" -p "{{param}}" --proxy="http://127.0.0.1:8080" --batch --threads=5'
+              purpose: "Route traffic through a proxy (e.g., Burp) for inspection and manual control"
+          - cookie_and_auth:
+              cmd: 'sqlmap -u "http://{{host}}/{{path}}?{{param}}=1" -p "{{param}}" --cookie="SESSION=abcd1234" --auth-type=Bearer --auth-cred="token" --batch'
+              purpose: "Include cookies / auth headers for authenticated scanning"
+          - force_https:
+              cmd: 'sqlmap -u "https://{{host}}/{{path}}?{{param}}=1" -p "{{param}}" --ignore-code=404 --batch'
+              purpose: "Force HTTPS target and ignore specific HTTP response codes"
+          - time_based_blind:
+              cmd: 'sqlmap -u "http://{{host}}/{{path}}?{{param}}=1" -p "{{param}}" --technique=T --time-sec=10 --batch'
+              purpose: "Time-based blind injection testing (use conservative timeouts to avoid long scans)"
+          - skip_waf:
+              cmd: 'sqlmap -u "http://{{host}}/{{path}}?{{param}}=1" -p "{{param}}" --skip-waf --batch'
+              purpose: "Attempt to bypass simple WAF heuristics (may be unreliable)"
+          - riskier_payloads:
+              cmd: 'sqlmap -u "http://{{host}}/{{path}}?{{param}}=1" -p "{{param}}" --risk=3 --level=5 --technique=BEUSTQ --batch'
+              purpose: "Run with higher-risk payloads (more intrusive) — use only with permission"
+          - save_output:
+              cmd: 'sqlmap -u "http://{{host}}/{{path}}?{{param}}=1" -p "{{param}}" --batch --output-dir=output/sqlmap_{{host}}'
+              purpose: "Save results and logs to a dedicated output directory"
+          - stealth_parameters:
+              cmd: 'sqlmap -u "http://{{host}}/{{path}}?{{param}}=1" -p "{{param}}" --random-agent --delay=3 --timeout=15 --batch'
+              purpose: "Introduce delays and random agents to reduce request rate and fingerprinting"
+
+####################################MORE_TOOLS####################################
+
+      # - name: katana_httpx_nuclei_pipeline
+      #   category: "discovery_and_scanning"
+      #   description: >
+      #     Combined fast discovery + probing + vulnerabilities scanning pipeline.
+      #     Uses katana to crawl/discover endpoints on a host, probes results with httpx,
+      #     and runs nuclei against live endpoints. Intended for authorized/ethical testing only.
+      #   commands:
+      #     - full_pipeline:
+      #         cmd: |
+      #           katana -u http://{{host}} -hl -jc --no-sandbox -c 1 -p 1 -rd 3 -rl 5 \
+      #            -H "User-Agent: $(shuf -n 1 -e 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' 'Mozilla/5.0 (X11; Linux x86_64)' 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)')" \
+      #           | httpx -silent -status-code -follow-redirects -tls-probe -random-agent -fr \
+      #           | nuclei -headless -sresp -rate-limit 25 -concurrency 20 -severity critical,high,medium \
+      #            -tags login,auth,exposure,api -markdown-export output/ \
+      #            -H "User-Agent: $(shuf -n 1 -e 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)' 'Mozilla/5.0 (X11; Linux x86_64)' 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)')" \
+      #            -tlsi -stats
+      #         purpose: "Run katana → httpx → nuclei pipeline against a target host (use only with permission)."
+      #
+      #     tools:
+      #       - name: nmap
+      #         category: "port_scanner"
+      #         description: "Network port and service scanner"
+      #         commands:
+      #           - initial_scan: 
+      #               cmd: 'nmap -sV -p- {{host}}'
+      #               purpose: "Quick scan of all ports and service versions"
+      #           - detailed_scan: 
+      #               cmd: 'nmap -sV -sC -A -p- -Pn {{host}}'
+      #               purpose: "Detailed scan with service detection and script scanning"
+            
+      #       - name: ftp
+      #         category: "service_check"
+      #         description: "FTP anonymous access tester"
+      #         commands:
+      #           - anonymous_check: 
+      #               cmd: |
+      #                 ftp -inv {{host}} <<'EOF'
+      #                 user anonymous anonymous@
+      #                 quit
+      #                 EOF
+      #               purpose: "Test for anonymous FTP access"
+
+      # - name: subfinder
+      #   category: "subdomain_enum"
+      #   description: "Fast subdomain discovery tool"
+      #   commands:
+      #     - enumerate:
+      #         cmd: 'subfinder -d {{host}} -silent'
+      #         purpose: "Discover subdomains of the target domain"
+
+                                                       
+      # - name: dirb
+      #   category: "directory_scanner"
+      #   description: "Web content scanner"
+      #   commands:
+      #     - scan:
+      #         cmd: 'dirb http://{{host}}/ {{wordlist}} -o dirb_results.txt'
+      #         purpose: "Discover hidden directories and files"
+      #   patterns:
+      #     - regex: "DIRECTORY: http://.+"
+      #       type: "directory"
+      #       severity: "info"
+      #     - regex: "\\+ http://.+(login|admin|setup|config)"
+      #       type: "sensitive_url"
+      #       severity: "medium"
+
+      # - name: nikto
+      #   category: "vulnerability_scanner"
+      #   description: "Web server vulnerability scanner"
+      #   commands:
+      #     - vuln_scan:
+      #         cmd: 'nikto -h http://{{host}} -Format txt'
+      #         purpose: "Scan for known vulnerabilities"
+      #   patterns:
+      #     - regex: "\\+ OSVDB-\\d+:"
+      #       type: "vulnerability"
+      #       severity: "high"
+
+
+
+      # - name: gobuster
+      #   category: "directory_scanner"
+      #   description: "Directory/File, DNS and VHost busting tool"
+      #   commands:
+      #     - dir_scan:
+      #         cmd: 'gobuster dir -u http://{{host}} -w {{wordlist}} -o gobuster_results.txt'
+      #         purpose: "Fast directory enumeration"
+      #     - vhost_scan:
+      #         cmd: 'gobuster vhost -u http://{{host}} -w {{wordlist}} -o gobuster_vhost.txt'
+      #         purpose: "Virtual host enumeration"
+      #   patterns:
+      #     - regex: "Found: .*?Status: 200"
+      #       type: "directory"
+      #       severity: "info"
+
+
+##################################################################################
+

@@ -1,0 +1,81 @@
+# Git
+.git
+.gitignore
+.gitattributes
+
+# Python
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+env/
+ENV/
+.venv
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Test & Coverage
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.hypothesis/
+
+# Documentation
+docs/_build/
+site/
+
+# Environment files (keep .env out of image)
+.env
+.env.local
+.env.*.local
+
+# Reports (generated locally, not needed in image)
+reports/
+*.pdf
+*.csv
+*.log
+
+# Large files
+*.tar.gz
+*.zip
+node_modules/
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+.circleci/
+
+# Docker
+docker-compose.override.yml
+Dockerfile.dev
+
+# Temp
+tmp/
+temp/
+*.tmp

@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  yaap:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: yaap:latest
+    container_name: yaap-scanner
+    
+    # Environment variables
+    environment:
+      # Required: LLM API Keys
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GOOGLE_API_KEY: ${GOOGLE_API_KEY:-}
+      
+      # Optional: Research API
+      TAVILY_API_KEY: ${TAVILY_API_KEY:-}
+      
+      # Python optimization
+      PYTHONUNBUFFERED: 1
+      PYTHONDONTWRITEBYTECODE: 1
+    
+    # Mount volumes
+    volumes:
+      # Output reports directory (host:/yaap/reports)
+      - ./reports:/yaap/reports
+      
+      # Configuration directory
+      - ./configs:/yaap/configs
+      
+      # Optional: Custom tools directory
+      - ./custom_tools:/yaap/custom_tools:ro
+    
+    # Networking
+    networks:
+      - yaap_network
+    
+    # Resource limits
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+        reservations:
+          cpus: '1'
+          memory: 1G
+    
+    # Security options
+    security_opt:
+      - no-new-privileges:true
+    
+    # Read-only root filesystem (strict security)
+    read_only: true
+    tmpfs:
+      - /tmp
+      - /run
+    
+    # Restart policy
+    restart: unless-stopped
+    
+    # Logging
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+    
+    # Override default command (optional - adjust as needed)
+    # command: >
+    #   uv run yaap.py 
+    #   -M claude-3-5-sonnet-20241022 
+    #   -H http://target.local 
+    #   -P anthropic 
+    #   -T hunt 
+    #   --csv_report
+
+networks:
+  yaap_network:
+    driver: bridge
